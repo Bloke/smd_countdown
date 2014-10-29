@@ -17,7 +17,7 @@ $plugin['name'] = 'smd_countdown';
 // 1 = Plugin help is in raw HTML.  Not recommended.
 # $plugin['allow_html_help'] = 1;
 
-$plugin['version'] = '0.10';
+$plugin['version'] = '0.20';
 $plugin['author'] = 'Stef Dawson';
 $plugin['author_uri'] = 'http://www.stefdawson.com/';
 $plugin['description'] = 'Time until article posted/expiry or any other date is reached';
@@ -71,33 +71,45 @@ if (!defined('txpinterface'))
         @include_once('zem_tpl.php');
 
 # --- BEGIN PLUGIN CODE ---
-function smd_countdown($atts, $thing=NULL) {
+/**
+ * smd_countdown: Textpattern CMS plugin for counting down to an event
+ */
+
+/**
+ * Public tag for determining the event target.
+ *
+ * Uses either the given date or an article field.
+ *
+ * @param  array $atts Tag attributes
+ */
+function smd_countdown($atts, $thing = null)
+{
 	global $thisarticle, $smd_timer;
 
 	extract(lAtts(array(
-		'to' => 'posted',
+		'to'    => 'posted', // or: expires, modified, ?some_field, or an English date string
 		'debug' => 0,
 	),$atts));
 
 	$destime = '';
 
-	if ($to == 'posted' || $to == 'expires' || $to == 'modified') {
+	if ($to === 'posted' || $to === 'expires' || $to === 'modified') {
 		assert_article();
 		$destime = $thisarticle[$to];
-	} else if (strpos($to, "?") === 0) {
+	} elseif (strpos($to, "?") === 0) {
 		assert_article();
 		$fldname = substr(strtolower($to), 1);
 		if (isset($thisarticle[$fldname])) {
 			$destime = (is_numeric($thisarticle[$fldname])) ? $thisarticle[$fldname] : strtotime($thisarticle[$fldname]);
 		}
-	} else if ($to != '') {
+	} elseif ($to !== '') {
 		$destime = strtotime($to);
 	}
 
 	if ($debug) {
 		echo '++ DESTINATION ++';
 		dmp($destime);
-		dmp(date('d M Y H:i:s',$destime));
+		dmp(date('d M Y H:i:s', $destime));
 	}
 
 	if ($destime) {
@@ -105,17 +117,17 @@ function smd_countdown($atts, $thing=NULL) {
 
 		// Split into years/months/weeks/days/hrs/minutes/seconds
 		$diff = $destime - $now;
-		$absdiff = ($diff>0) ? $diff : $now - $destime;
+		$absdiff = ($diff > 0) ? $diff : $now - $destime;
 		$smd_timer['difference'] = $diff;
 		$smd_timer['abs_difference'] = $absdiff;
 		$smd_timer['destination'] = $destime;
 
 		$lookup = array(
-			'year' => array(60 * 60 * 24 * 365),
-			'month' => array(60 * 60 * 24 * 30, 12), // month(ish)
-			'week' => array(60 * 60 * 24 * 7, 52),
-			'day' => array(60 * 60 * 24, 7),
-			'hour' => array(60 * 60, 24),
+			'year'   => array(60 * 60 * 24 * 365),
+			'month'  => array(60 * 60 * 24 * 30, 12), // month(ish)
+			'week'   => array(60 * 60 * 24 * 7, 52),
+			'day'    => array(60 * 60 * 24, 7),
+			'hour'   => array(60 * 60, 24),
 			'minute' => array(60, 60),
 			'second' => array(1, 60),
 		);
@@ -131,7 +143,7 @@ function smd_countdown($atts, $thing=NULL) {
 			dmp($smd_timer);
 		}
 
-		$result = ($diff>0) ? false : true; // True if destination reached, false otherwise
+		$result = ($diff > 0) ? false : true; // True if destination reached, false otherwise
 
 		return parse(EvalElse($thing, $result));
 	} else {
@@ -139,37 +151,47 @@ function smd_countdown($atts, $thing=NULL) {
 	}
 }
 
-function smd_time_info($atts) {
+/**
+ * Public tag for displaying portions of the timer.
+ *
+ * @param  array $atts Tag attributes
+ * @return HTML
+ */
+function smd_time_info($atts)
+{
 	global $smd_timer;
 
 	extract(lAtts(array(
-		'display' => '',
-		'show_zeros' => '1',
-		'pad' => '2,0',
-		'label' => '',
-		'labeltag' => '',
-		'labelafter' => 0,
+		'display'     => '',
+		'show_zeros'  => '1',
+		'pad'         => '2,0',
+		'label'       => '',
+		'labeltag'    => null,
+		'labelafter'  => 0,
 		'labelspacer' => '',
-		'wraptag' => '',
-		'class' => __FUNCTION__,
-		'break' => '',
-		'debug' => 0,
+		'wraptag'     => '',
+		'class'       => __FUNCTION__,
+		'break'       => '',
+		'debug'       => 0,
 	),$atts));
 
 	$display = do_list($display);
 	$label = do_list($label);
 	$pad = do_list($pad);
 	$pad[0] = (empty($pad[0])) ? '1' : $pad[0];
-	$pad[1] = (count($pad)==1) ? '0' : $pad[1];
+	$pad[1] = (count($pad) === 1) ? '0' : $pad[1];
 
 	$out = array();
 	$use_plural = false;
 
 	foreach ($display as $item) {
+		// Not comparing strict in this block, as the timer item is likely a string
+		// (but may be a number).
 		if (isset($smd_timer[$item])) {
 			if ($smd_timer[$item] > 0 || ($smd_timer[$item] == 0 && (!empty($out) || $show_zeros))) {
 				$out[] = str_pad($smd_timer[$item], $pad[0], $pad[1], STR_PAD_LEFT);
 			}
+
 			$use_plural = ($smd_timer[$item] != 1) ? true : false;
 		}
 	}
@@ -177,261 +199,241 @@ function smd_time_info($atts) {
 	$theLabel = ($use_plural && isset($label[1])) ? $label[1] : $label[0];
 
 	return ($out)
-			? (($labelafter==0) ? doLabel($theLabel.$labelspacer, $labeltag) : '').
-				doWrap($out, $wraptag, $break, $class).
-				(($labelafter==1) ? doLabel($labelspacer.$theLabel, $labeltag) : '')
-			: '';
+		? (($labelafter == 0) ? smd_countdown_doLabel($theLabel.$labelspacer, $labeltag) : '').
+			doWrap($out, $wraptag, $break, $class).
+			(($labelafter == 1) ? smd_countdown_doLabel($labelspacer.$theLabel, $labeltag) : '')
+		: '';
 }
+
+/**
+ * More intelligent replacement for the core's doLabel().
+ *
+ * The core version forces a &lt;br&gt; tag after the content
+ * which is undesirable.
+ */
+function smd_countdown_doLabel($label = '', $labeltag = '')
+{
+	return (empty($labeltag) ? $label : tag($label, $labeltag));
+}
+
 # --- END PLUGIN CODE ---
 if (0) {
 ?>
 <!--
-# --- BEGIN PLUGIN CSS ---
-<style type="text/css">
-#smd_help { line-height:1.5 ;}
-#smd_help code { font-weight:bold; font: 105%/130% "Courier New", courier, monospace; background-color: #FFFFCC;}
-#smd_help code.block { font-weight:normal; border:1px dotted #999; background-color: #f0e68c; display:block; margin:10px 10px 20px; padding:10px; }
-#smd_help h1 { color: #369; font: 20px Georgia, sans-serif; margin: 0; text-align: center; }
-#smd_help h2 { border-bottom: 1px solid black; padding:10px 0 0; color: #369; font: 17px Georgia, sans-serif; }
-#smd_help h3 { color: #275685; font: bold 12px Arial, sans-serif; letter-spacing: 1px; margin: 10px 0 0;text-transform: uppercase; text-decoration:underline;}
-#smd_help h4 { font: bold 11px Arial, sans-serif; letter-spacing: 1px; margin: 10px 0 0 ;text-transform: uppercase; }
-#smd_help .atnm { font-weight:bold; color:#33d; }
-#smd_help .atval { font-style:italic; color:#33d; }
-#smd_help .mand { background:#eee; border:1px dotted #999; }
-#smd_help table {width:90%; text-align:center; padding-bottom:1em;}
-#smd_help td, #smd_help th {border:1px solid #999; padding:.5em 0;}
-#smd_help ul { list-style-type:square; }
-#smd_help .required {color:red;}
-#smd_help li { margin:5px 20px 5px 30px; }
-#smd_help .break { margin-top:5px; }
-</style>
-# --- END PLUGIN CSS ---
--->
-<!--
 # --- BEGIN PLUGIN HELP ---
-<div id="smd_help">
+h1. smd_countdown
 
-	<h1>smd_countdown</h1>
+h2. Features
 
-	<h2>Features</h2>
+* Countdown to either:
+** article posted, expired, modified time.
+** any time given in any article field.
+** any arbitrary time given as an English date.
+* Supports @<txp:else />@ so you can take action when the time is reached.
+* Display number of years, months, weeks, days, hours, minutes, seconds as either:
+** an absolute number (10 days to go).
+** a date-based number (1 week 3 days to go).
 
-	<ul>
-		<li>Countdown to either:
-	<ul>
-		<li>article posted, expired, modified time</li>
-		<li>any time given in any article field</li>
-		<li>any arbitrary time given as an English date</li>
-	</ul></li>
-		<li>Supports <code>&lt;txp:else /&gt;</code> so you can take action when the time is reached</li>
-		<li>Display number of years, months, weeks, days, hours, minutes, seconds as either:
-	<ul>
-		<li>an absolute number (10 days to go)</li>
-		<li>a date-based number (1 week 3 days to go)</li>
-	</ul></li>
-	</ul>
+h2(#install). Installation / Uninstallation
 
-	<h2 id="author">Author / credits</h2>
+Download the plugin from either "textpattern.org":http://textpattern.org/plugins/1115/smd_countdown, or the "software page":http://stefdawson.com/sw, paste the code into the Textpattern Admin -&gt; Plugins pane, install and enable the plugin. Visit the "forum thread":http://forum.textpattern.com/viewtopic.php?id=31494 for more info or to report on the success or otherwise of the plugin.
 
-	<p><a href="http://stefdawson.com/contact">Stef Dawson</a>. A more flexible version of glx_countdown.</p>
+To uninstall, delete from the __Admin->Plugins__ page.
 
-	<h2 id="install">Installation / Uninstallation</h2>
+h2. Usage
 
-	<p>Download the plugin from either <a href="http://textpattern.org/plugins/1115/smd_countdown">textpattern.org</a>, or the <a href="http://stefdawson.com/sw">software page</a>, paste the code into the Textpattern Admin -&gt; Plugins pane, install and enable the plugin. Visit the <a href="http://forum.textpattern.com/viewtopic.php?id=31494">forum thread</a> for more info or to report on the success or otherwise of the plugin.</p>
+h3. @<txp:smd_countdown>@
 
-	<p>To uninstall, delete from the Admin -&gt; Plugins page.</p>
+Place this tag in any article or page to count down to a specific date/time. If you wish to use it to count down to a date in the given article you must ensure it's used in an article context (the plugin will complain if you don't). Use the @to@ attribute to configure the destination date. Examples:
 
-	<h2>Usage</h2>
+In a Page:
 
-	<h3><code>&lt;txp:smd_countdown&gt;</code></h3>
+bc. <txp:smd_countdown to="25 Dec 2014">
+  It's Christmas day!
+</txp:smd_countdown>
 
-	<p>Place this tag in any article or page to count down to a specific date/time. If you wish to use it to count down to a date in the given article you must ensure it&#8217;s used in an article context (the plugin will complain if you don&#8217;t). Use the <code>to</code> attribute to configure the destination date. Examples:</p>
 
-	<p>In a Page:</p>
+In an article / article Form:
 
-<pre class="block"><code class="block">&lt;txp:smd_countdown to=&quot;25 Dec 2009&quot;&gt;
-  It&#39;s Christmas day!
-&lt;/txp:smd_countdown&gt;
-</code></pre>
-
-	<p>In an article / article Form:</p>
-
-<pre class="block"><code class="block">&lt;txp:smd_countdown&gt;
+bc. <txp:smd_countdown>
   Posted date has arrived.
-&lt;txp:else /&gt;
-  Event hasn&#39;t started yet.
-&lt;/txp:smd_countdown&gt;
-</code></pre>
+<txp:else />
+  Event hasn't started yet.
+</txp:smd_countdown>
 
-	<p>Or:</p>
 
-<pre class="block"><code class="block">&lt;txp:smd_countdown to=&quot;expires&quot;&gt;
+Or:
+
+bc. <txp:smd_countdown to="expires">
   Too late, you missed it :-(
-&lt;txp:else /&gt;
-  There&#39;s still time to get to the show...
-&lt;/txp:smd_countdown&gt;
-</code></pre>
+<txp:else />
+  There's still time to get to the show...
+</txp:smd_countdown>
 
-	<p>Or:</p>
 
-<pre class="block"><code class="block">&lt;txp:smd_countdown to=&quot;?my_date&quot;&gt;
+Or:
+
+bc. <txp:smd_countdown to="?my_date">
   The date in custom field #1 (called my_date) has been reached
-&lt;/txp:smd_countdown&gt;
-</code></pre>
+</txp:smd_countdown>
 
-	<h3><code>&lt;txp:smd_time_info&gt;</code></h3>
 
-	<p>If you wish to show visitors how much time they have left before the destination arrives, use this tag to display various time elements. The following attributes configure what you wish to show:</p>
+h3. @<txp:smd_time_info>@
 
-	<h4 class="atts " id="attributes">Attributes</h4>
+If you wish to show visitors how much time they have left before the destination arrives, use this tag to display various time elements. The following attributes configure what you wish to show:
 
-	<ul>
-		<li><span class="atnm">display</span> : the item(s) you wish to display. Can use one or more (comma-separated) from the following:
-	<ul>
-		<li><span class="atval">year</span> (or <span class="atval">year_total</span>) : the number of years until the event</li>
-		<li><span class="atval">month</span> : the number of calendar months until the event, maximum 12<sup class="footnote"><a href="#fn312234a7eebcc821e6">1</a></sup></li>
-		<li><span class="atval">month_total</span> : the absolute number of months until the event<sup class="footnote"><a href="#fn312234a7eebcc821e6">1</a></sup></li>
-		<li><span class="atval">week</span> : the number of calendar weeks until the event, maximum 52<sup class="footnote"><a href="#fn246764a7eebcc82225">2</a></sup></li>
-		<li><span class="atval">week_total</span> : the absolute number of weeks until the event<sup class="footnote"><a href="#fn246764a7eebcc82225">2</a></sup></li>
-		<li><span class="atval">day</span> : the number of calendar days until the event, maximum 7</li>
-		<li><span class="atval">day_total</span> : the absolute number of days until the event</li>
-		<li><span class="atval">hour</span> : the number of day-based hours until the event, maximum 24</li>
-		<li><span class="atval">hour_total</span> : the absolute number of hours until the event</li>
-		<li><span class="atval">minute</span> : the number of hour-based minutes until the event, maximum 60</li>
-		<li><span class="atval">minute_total</span> : the absolute number of minutes until the event</li>
-		<li><span class="atval">second</span> : the number of minute-based seconds until the event, maximum 60</li>
-		<li><span class="atval">second_total</span> : the absolute number of seconds until the event</li>
-		<li><span class="atval">destination</span> : the <span class="caps">UNIX</span> timestamp of the destination</li>
-		<li><span class="atval">difference</span> : the <span class="caps">UNIX</span> timestamp difference between now and the destination (may be negative if the destination has passed)</li>
-		<li><span class="atval">abs_difference</span> : the <span class="caps">UNIX</span> timestamp difference between now and the destination irrespective of whether the date has passed or not</li>
-	</ul></li>
-		<li><span class="atnm">show_zeros</span> : if you wish to hide leading items that have zero months, weeks, days, etc, set this to 0. Default: 1</li>
-		<li><span class="atnm">pad</span> : pad the numerical output with some text. Specify up to two comma-separated values here. The first is the total width in characters of the string you wish to display. The second is the text with which you wish to pad the numbers. Default: <code>2, 0</code> (i.e. pad to a width of two characters, using zeros if necessary)</li>
-		<li><span class="atnm">label</span> : up to two values with which you can label the given display item(s). If you specify two values, the first is what to use for singular numbers (e.g. 1 <strong>hour</strong>), the second is the plural (e.g. 3 <strong>hours</strong>). Note that using the <code>singular, plural</code> form in this attribute does not usually make sense when <code>display</code> is a list of items. Default: unset</li>
-		<li><span class="atnm">labeltag</span> : (X)HTML tag, without brackets, to wrap the label with. Default: unset</li>
-		<li><span class="atnm">labelafter</span> : set to 1 if you wish the label to be appended to the displayed item(s). Default: 0 (i.e. prepend)</li>
-		<li><span class="atnm">labelspacer</span> : text to put before/after the label. Very useful if <code>labelafter=&quot;1&quot;</code> and you wish to put a space between the number and the label. Default: unset</li>
-		<li><span class="atnm">wraptag</span> : (X)HTML tag, without brackets, to wrap the displayed items with. Default: unset</li>
-		<li><span class="atnm">class</span> : <span class="caps">CSS</span> class name to apply to the wraptag. Default: <code>smd_time_info</code></li>
-		<li><span class="atnm">break</span> : (X)HTML tag, (without brackets) or other delimiter to wrap / put between each display item. Default: unset</li>
-	</ul>
+h4. Attributes
 
-	<p id="fn312234a7eebcc821e6" class="footnote"><sup>1</sup> Months may get a little distorted over time because a month is assumed to be 30 days</p>
+* *display* the item(s) you wish to display. Can use one or more (comma-separated) from the following:
+** *year* (or year_total) the number of years until the event.
+** *month* the number of calendar months until the event, maximum 12[1].
+** *month_total* the absolute number of months until the event[1].
+** *week* the number of calendar weeks until the event, maximum 52[2].
+** *week_total* the absolute number of weeks until the event[2].
+** *day* the number of calendar days until the event, maximum 7.
+** *day_total* the absolute number of days until the event.
+** *hour* the number of day-based hours until the event, maximum 24.
+** *hour_total* the absolute number of hours until the event.
+** *minute* the number of hour-based minutes until the event, maximum 60.
+** *minute_total* the absolute number of minutes until the event.
+** *second* the number of minute-based seconds until the event, maximum 60.
+** *second_total* the absolute number of seconds until the event.
+** *destination* the UNIX timestamp of the destination.
+** *difference* the UNIX timestamp difference between now and the destination (may be negative if the destination has passed).
+** *abs_difference* the UNIX timestamp difference between now and the destination irrespective of whether the date has passed or not.
+* *show_zeros* if you wish to hide leading items that have zero months, weeks, days, etc, set this to 0. Default: 1.
+* *pad* pad the numerical output with some text. Specify up to two comma-separated values here. The first is the total width in characters of the string you wish to display. The second is the text with which you wish to pad the numbers. Default: @2, 0@ (i.e. pad to a width of two characters, using zeros if necessary).
+* *label* up to two values with which you can label the given display item(s). If you specify two values, the first is what to use for singular numbers (e.g. 1 *hour*), the second is the plural (e.g. 3 *hours*). Note that using the @singular, plural@ form in this attribute does not usually make sense when @display@ is a list of items. Default: unset.
+* *labeltag* HTML tag, without brackets, to wrap the label with. Default: unset.
+* *labelafter* set to 1 if you wish the label to be appended to the displayed item(s). Default: 0 (i.e. prepend).
+* *labelspacer* text to put before/after the label. Very useful if @labelafter="1"@ and you wish to put a space between the number and the label. Default: unset.
+* *wraptag* HTML tag, without brackets, to wrap the displayed items with. Default: unset.
+* *class* CSS class name to apply to the wraptag. Default: @smd_time_info@.
+* *break* HTML tag, (without brackets) or other delimiter to wrap / put between each display item. Default: unset.
 
-	<p id="fn246764a7eebcc82225" class="footnote"><sup>2</sup> Weeks may get a little distorted over time because some years have 53 weeks</p>
+fn1. Months may get a little distorted over time because a month is assumed to be 30 days.
 
-	<h2>Examples</h2>
+fn2. Weeks may get a little distorted over time because some years have 53 weeks.
 
-	<h3 id="eg1">Example 1: Countdown to posted item</h3>
+h2. Examples
 
-	<p>The tag defaults to the posted date of the current article.</p>
+h3(#eg1). Example 1: Countdown to posted item
 
-<pre class="block"><code class="block">The party &lt;txp:smd_countdown&gt;
+The tag defaults to the posted date of the current article.
+
+bc. The party <txp:smd_countdown>
    has arrived. Get your raving trousers on!
-&lt;txp:else /&gt;
-   is &lt;txp:smd_time_info display=&quot;day_total&quot; /&gt;
+<txp:else />
+   is <txp:smd_time_info display="day_total" />
      days away: buy a shirt.
-&lt;/txp:smd_countdown&gt;
-</code></pre>
+</txp:smd_countdown>
 
-	<p>The above will always show &#8216;days away&#8217;, even when the last day is reached. To improve this, you can do:</p>
 
-<pre class="block"><code class="block">is &lt;txp:smd_time_info display=&quot;day_total&quot;
-     label=&quot;day, days&quot; labelafter=&quot;1&quot;
-     labelspacer=&quot; &quot; /&gt;
+The above will always show ‘days away', even when the last day is reached. To improve this, you can do:
+
+bc. is <txp:smd_time_info display="day_total"
+     label="day, days" labelafter="1"
+     labelspacer=" " />
    away: buy a shirt.
-</code></pre>
 
-	<h3 id="eg2">Example 2: Displaying multiple items</h3>
 
-<pre class="block"><code class="block">&lt;txp:smd_countdown to=&quot;expires&quot;&gt;
-&lt;txp:else /&gt;
+h3(#eg2). Example 2: Displaying multiple items
+
+bc. <txp:smd_countdown to="expires">
+<txp:else />
    Time remaining:
-   &lt;txp:smd_time_info display=&quot;hour, minute, second&quot;
-     break=&quot;:&quot; label=&quot;s&quot; labelafter=&quot;1&quot; /&gt;
-&lt;/txp:smd_countdown&gt;
-</code></pre>
+   <txp:smd_time_info display="hour, minute, second"
+     break=":" label="s" labelafter="1" />
+</txp:smd_countdown>
 
-	<p>Add <code>show_zeros=&quot;0&quot;</code> if you wish to remove any leading zero items as the date draws near. Note that it only removes ther most significant &#8216;zero&#8217; items. For example, if you are just over 1 week away from an event:</p>
 
-<pre class="block"><code class="block">&lt;txp:smd_time_info
-     display=&quot;week, day, hour, minute, second&quot;
-     break=&quot;:&quot; show_zeros=&quot;0&quot; /&gt;
-</code></pre>
+Add @show_zeros="0"@ if you wish to remove any leading zero items as the date draws near. Note that it only removes the most significant ‘zero' items. For example, if you are just over 1 week away from an event:
 
-	<p>Might display: <code>01:00:05:00:19</code> (1 week, 0 days, 5 hours, 0 minutes, 19 seconds). But at the same time next day it would show: <code>06:05:00:19</code> (6 days, 5 hours, 0 minutes, 19 seconds).</p>
+bc. <txp:smd_time_info
+     display="week, day, hour, minute, second"
+     break=":" show_zeros="0" />
 
-	<h3 id="eg3">Example 3: Using other fields</h3>
 
-	<p>A question mark before the name of the field will use the date or timestamp given in that field.</p>
+Might display: @01:00:05:00:19@ (1 week, 0 days, 5 hours, 0 minutes, 19 seconds). But at the same time next day it would show: @06:05:00:19@ (6 days, 5 hours, 0 minutes, 19 seconds).
 
-<pre class="block"><code class="block">&lt;txp:article_custom time=&quot;any&quot; section=&quot;events&quot;&gt;
-   &lt;txp:permlink&gt;&lt;txp:title /&gt;&lt;/txp:permlink&gt;
-   &lt;txp:smd_countdown to=&quot;?event_date&quot;&gt;
-      &lt;txp:excerpt /&gt;
-   &lt;txp:else /&gt;
+h3(#eg3). Example 3: Using other fields
+
+A question mark before the name of the field will use the date or timestamp given in that field.
+
+bc. <txp:article_custom time="any" section="events">
+   <txp:permlink><txp:title /></txp:permlink>
+   <txp:smd_countdown to="?event_date">
+      <txp:excerpt />
+   <txp:else />
       Event kicks off in:
-      &lt;txp:smd_time_info display=&quot;day&quot; pad=&quot;&quot; show_zeros=&quot;0&quot;
-        label=&quot;day, days&quot; labelafter=&quot;1&quot; labelspacer=&quot; &quot; /&gt;
-      &lt;txp:smd_time_info display=&quot;hour, minute, second&quot;
-        break=&quot;:&quot; label=&quot;s&quot; labelafter=&quot;1&quot; /&gt;
-   &lt;/txp:smd_countdown&gt;
-&lt;/txp:article_custom&gt;
-</code></pre>
+      <txp:smd_time_info display="day" pad="" show_zeros="0"
+        label="day, days" labelafter="1" labelspacer=" " />
+      <txp:smd_time_info display="hour, minute, second"
+        break=":" label="s" labelafter="1" />
+   </txp:smd_countdown>
+</txp:article_custom>
 
-	<p>The <code>event_date</code> custom field in this case must contain either:</p>
 
-	<ul>
-		<li>an English date such as <code>25 Aug 2009 12:00:00</code></li>
-		<li>a <span class="caps">UNIX</span> timestamp value</li>
-	</ul>
+The @event_date@ custom field in this case must contain either:
 
-	<h3 id="eg4">Example 4: Chaining timers</h3>
+* an English date such as @25 Aug 2014 12:00:00@
+* a UNIX timestamp value
 
-	<p>Starting to go a little crazy now&#8230;</p>
+h3(#eg4). Example 4: Chaining timers
 
-<pre class="block"><code class="block">&lt;txp:article_custom time=&quot;any&quot; section=&quot;zoo&quot;
-     wraptag=&quot;ul&quot; break=&quot;ul&quot;&gt;
-   &lt;txp:title /&gt;
-   &lt;txp:smd_countdown&gt;
-      &lt;!-- When the article has been posted, this bit runs --&gt;
-      &lt;txp:smd_countdown to=&quot;expires&quot;&gt;
-         &lt;!-- When the article&#39;s expiry is reached... --&gt;
-         Time&#39;s up!
+Starting to go a little crazy now...
+
+bc. <txp:article_custom time="any" section="zoo"
+     wraptag="ul" break="ul">
+   <txp:title />
+   <txp:smd_countdown>
+      <!-- When the article has been posted, this bit runs -->
+      <txp:smd_countdown to="expires">
+         <!-- When the article's expiry is reached... -->
+         Time's up!
          You missed this animal by
-         &lt;txp:smd_time_info display=&quot;second_total&quot;
-           labelafter=&quot;1&quot; label=&quot;second, seconds&quot;
-           labelspacer=&quot; &quot; /&gt;
-      &lt;txp:else /&gt;
-         &lt;!-- While the article is live --&gt;
-         &lt;txp:excerpt /&gt;
+         <txp:smd_time_info display="second_total"
+           labelafter="1" label="second, seconds"
+           labelspacer=" " />
+      <txp:else />
+         <!-- While the article is live -->
+         <txp:excerpt />
          You have
-         &lt;txp:smd_time_info display=&quot;hour&quot;
-           labelafter=&quot;1&quot; labelspacer=&quot; &quot;
-           label=&quot;hour, hours&quot; show_zeros=&quot;0&quot; /&gt;
-         &lt;txp:smd_time_info display=&quot;minute&quot;
-           labelafter=&quot;1&quot; labelspacer=&quot; &quot;
-           label=&quot;minute, minutes&quot; show_zeros=&quot;0&quot; /&gt;
-         &lt;txp:smd_time_info display=&quot;second&quot;
-           labelafter=&quot;1&quot; labelspacer=&quot; &quot;
-           label=&quot;second, seconds&quot; show_zeros=&quot;0&quot; /&gt;
-         left to &lt;txp:permlink&gt;enjoy this animal&lt;/txp:permlink&gt;.
-      &lt;/txp:smd_countdown&gt;
-   &lt;txp:else /&gt;
-      &lt;!-- This portion is displayed before the article&#39;s
-          posted time is met --&gt;
-      arrives in &lt;txp:smd_time_info
-        display=&quot;second_total&quot; /&gt; seconds.
-   &lt;/txp:smd_countdown&gt;
-&lt;/txp:article_custom&gt;
-</code></pre>
+         <txp:smd_time_info display="hour"
+           labelafter="1" labelspacer=" "
+           label="hour, hours" show_zeros="0" />
+         <txp:smd_time_info display="minute"
+           labelafter="1" labelspacer=" "
+           label="minute, minutes" show_zeros="0" />
+         <txp:smd_time_info display="second"
+           labelafter="1" labelspacer=" "
+           label="second, seconds" show_zeros="0" />
+         left to <txp:permlink>enjoy this animal</txp:permlink>.
+      </txp:smd_countdown>
+   <txp:else />
+      <!-- This portion is displayed before the article's
+          posted time is met -->
+      arrives in <txp:smd_time_info
+        display="second_total" /> seconds.
+   </txp:smd_countdown>
+</txp:article_custom>
 
-	<p>Very useful for competition articles or events. Note that this only works if the <em>publish expired articles</em> setting is switched on in Advanced Prefs.</p>
 
-	<h3 id="eg5">Example 5: There is no example 5&#8230;</h3>
+Very useful for competition articles or events. Note that this only works if the _publish expired articles_ setting is switched on in Advanced Prefs.
 
-	<p>&#8230; but as food for further study you could use the output from smd_countdown to seed the start of a javascript or flash-based timer which updated a real-time clock counting down to your event.</p>
+h3(#eg5). Example 5: There is no example 5...
 
-</div>
+... but as food for further study you could use the output from smd_countdown to seed the start of a javascript or flash-based timer which updated a real-time clock counting down to your event.
+
+h2(#author). Author / credits
+
+"Stef Dawson":http://stefdawson.com/contact. A more flexible version of glx_countdown.
+
+h2(#changelog). Changelog
+
+* 29 Oct 2014 | 0.20 | Fixed label br tag
+* 09 Aug 2009 | 0.10 | Initial release
+
 # --- END PLUGIN HELP ---
 -->
 <?php
