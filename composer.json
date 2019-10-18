@@ -1,0 +1,16 @@
+{
+  "name": "bloke/smd_countdown",
+  "description": "Time until Textpattern article posted/expiry or any other date is reached",
+  "keywords": ["textpattern", "plugin", "timer", "date", "countdown", "until", "event"],
+  "homepage": "https://github.com/bloke/smd_countdown",
+  "license": "GPL-2.0",
+  "type": "textpattern-plugin",
+  "support": {
+    "issues": "https://github.com/bloke/smd_countdown/issues",
+    "source": "https://github.com/bloke/smd_countdown"
+  },
+  "require": {
+    "textpattern/lock": ">=4.3.0",
+    "textpattern/installer": "*"
+  }
+}

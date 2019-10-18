@@ -1,0 +1,11 @@
+{
+  "name": "smd_countdown",
+  "description": "Time until Textpattern article posted/expiry or any other date is reached",
+  "version": "0.2.1",
+  "type": 0,
+  "author": "Stef Dawson",
+  "author_uri": "https://stefdawson.com/",
+  "order": 5,
+  "flags": 0,
+  "help": {"file" : ["./README.textile"]}
+}
